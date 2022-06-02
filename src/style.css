@@ -1,0 +1,44 @@
+body{
+  margin: 0px;
+  overflow-y: hidden;
+  overflow-x: hidden;
+}
+
+canvas{
+  background-color: black;
+  margin: 0px;
+  overflow-y: hidden;
+  overflow-x: hidden;
+}
+
+#login{
+  display: flex;
+  flex-direction: column;
+
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+
+  align-items: center;
+}
+
+.login-text{
+  color:white;
+  text-align: center;
+}
+
+#login-button{
+  width: 70%;
+  margin: 5%;
+}
+
+.text-field{
+  box-sizing: border-box;
+  border: 2px solid #ccc;
+  border-radius: 4px;
+  background-color: #f8f8f8;
+  resize: none;
+  height: 30px;
+  margin-top: 2%;
+}
