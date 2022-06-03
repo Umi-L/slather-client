@@ -15,6 +15,7 @@ interface PlayerData{
   body: SnakePoint[];
   heading: number;
   speed: number;
+  radius:number;
 }
 
 interface FoodOrb{
@@ -25,6 +26,7 @@ interface FoodOrb{
 }
 
 const fps = 60;
+//const perfectFrameTime = 1000 / fps;
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
@@ -35,8 +37,8 @@ let users:IClients;
 
 let id:number;
 
+let lastUpdate:number = Date.now();
 
-let snakeRadius = 10;
 let speed = 0;
 
 let mapHeight = 0;
@@ -44,10 +46,13 @@ let mapWidth = 0;
 
 let posX = 0;
 let posY = 0;
+let radius = 0;
 let body : SnakePoint[] = [];
 let heading = 0;
 
 let foodOrbs:FoodOrb[] = [];
+
+let intervals:number[] = []
 
 document.getElementById("login-button")!.onclick = joinGame;
 
@@ -75,8 +80,9 @@ function joinGame(){
 
       socket.send(JSON.stringify(data));
 
-      setInterval(nextFrame, 1000/fps);
-      setInterval(updateServer, 1000 / 20);
+      lastUpdate = Date.now();
+      intervals.push(setInterval(nextFrame, 1000 / fps));
+      intervals.push(setInterval(updateServer, 1000 / 20));
 
     };
 
@@ -92,10 +98,9 @@ function joinGame(){
             mapHeight = jsonData.data.mapHeight;
 
             speed = jsonData.data.speed;
+            radius = jsonData.data.radius;
 
-            foodOrbs = jsonData.data.orbs;
-            console.log(foodOrbs);
-          
+            foodOrbs = jsonData.data.orbs;          
 
             document.getElementById("login")?.setAttribute("style", "visibility: hidden;")
             break;
@@ -108,6 +113,8 @@ function joinGame(){
 
             body = users[id].body;
 
+            radius = users[id].radius;
+
             foodOrbs = foodOrbs.concat(jsonData.orbs);
 
             foodOrbs.forEach((orb)=>{
@@ -117,6 +124,16 @@ function joinGame(){
             })
 
             break;
+
+          case "dead":
+            document.getElementById("login")?.setAttribute("style", "");
+            
+            intervals.forEach((interval:number)=>{
+              clearInterval(interval);
+            })
+
+            break
+
         }
 
       }catch(error){
@@ -138,6 +155,9 @@ function drawSnakes(){
   ctx.fillStyle = "#32a852";
   ctx.strokeStyle = "#000000";
 
+  ctx.font = "20px Arial";
+  ctx.textAlign = "center";
+
   Object.keys(users).forEach((userID:any) =>{
 
     if (userID == id)
@@ -146,14 +166,20 @@ function drawSnakes(){
     let offsetX = posX - canvas.width / 2;
     let offsetY = posY - canvas.height / 2;
 
+
     users[userID].body.forEach((segment)=>{
 
-      //draw circle
-      ctx.beginPath();
-      ctx.arc(segment.x - offsetX, segment.y - offsetY, snakeRadius, 0, 2 * Math.PI)
-      ctx.fill();
-      ctx.stroke();
+      if (isOnScreen(segment.x, segment.y)){
+        //draw circle
+        ctx.beginPath();
+        ctx.arc(segment.x - offsetX, segment.y - offsetY, users[userID].radius, 0, 2 * Math.PI)
+        ctx.fill();
+        ctx.stroke();
+      }
     })
+
+    ctx.strokeText(users[userID].username, users[userID].body[0].x - offsetX, users[userID].body[0].y - offsetY - users[userID].radius)
+
   })
 }
 
@@ -169,7 +195,7 @@ function drawSelf(){
 
     //draw circle
     ctx.beginPath();
-    ctx.arc(segment.x - offsetX, segment.y - offsetY, snakeRadius, 0, 2 * Math.PI)
+    ctx.arc(segment.x - offsetX, segment.y - offsetY, radius, 0, 2 * Math.PI)
     ctx.fill();
     ctx.stroke();
   })
@@ -180,9 +206,13 @@ function clearCanvas(){
 }
 
 function nextFrame(){
+  let now = Date.now();
+  let dt = (now - lastUpdate) / 1000 // perfectFrameTime;
+  lastUpdate = now;
+
   clearCanvas();
 
-  //updateSnakePos();
+  //updateSnakePos(dt);
 
   drawSelf();
   drawSnakes();
@@ -205,7 +235,7 @@ function drawBorder(){
   let offsetX = posX - canvas.width / 2;
   let offsetY = posY - canvas.height / 2;
 
-  ctx.rect(0 - offsetX - snakeRadius, 0 - offsetY - snakeRadius, mapWidth + snakeRadius*2, mapHeight + snakeRadius*2);
+  ctx.rect(0 - offsetX - 10, 0 - offsetY - 10, mapWidth + 10*2, mapHeight + 10*2);
   ctx.stroke();
 }
 
@@ -213,16 +243,14 @@ function angleBetween(x1:number, y1:number, x2:number, y2:number){
   return Math.atan2( y2 - y1, x2 - x1 );
 }
 
-function updateSnakePos(){
+function updateSnakePos(dt:number){
   //move snake forward
-
-  let dt = 20 / 1000;
 
   let previousPoint = body[0];
 
   let nextPoint = {
-      x: speed * dt * Math.cos(heading) + previousPoint.x,
-      y: speed * dt * Math.sin(heading) + previousPoint.y,
+      x: (speed * dt) * Math.cos(heading) + previousPoint.x,
+      y: (speed * dt) * Math.sin(heading) + previousPoint.y,
   } as SnakePoint;
 
 
@@ -238,12 +266,14 @@ function drawOrbs(){
 
   foodOrbs.forEach((orb)=>{
 
-    ctx.fillStyle = orb.color;
+    if (isOnScreen(orb.x, orb.y)){
+      ctx.fillStyle = orb.color;
 
-    ctx.beginPath();
-    ctx.arc(orb.x - offsetX, orb.y - offsetY, orb.value * 70 + 10, 0, 2 * Math.PI)
-    ctx.fill();
-    ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(orb.x - offsetX, orb.y - offsetY, clamp(orb.value*50, 15, 50), 0, 2 * Math.PI)
+      ctx.fill();
+      ctx.stroke();
+    }
   })
 }
 
@@ -260,15 +290,28 @@ function clampPoint(point:SnakePoint): SnakePoint{
 }
 
 function checkFoodOrbs(){
-  for (let i = foodOrbs.length - 1; i >= 0; i--)
-  {
-      if (pointDist(foodOrbs[i].x, foodOrbs[i].y, posX, posY) < 20){
-          foodOrbs.splice(i, 1);
-      }
-  }       
+  Object.keys(users).forEach((key:number|string)=>{
+
+    let data = users[key as number];
+
+    for (let i = foodOrbs.length - 1; i >= 0; i--)
+    {
+        if (pointDist(foodOrbs[i].x, foodOrbs[i].y, data.body[0].x, data.body[0].y) < data.radius*2 + 10){
+            foodOrbs.splice(i, 1);
+        }
+    }     
+  })  
 }
 
 
 function pointDist(x1:number, y1:number, x2:number, y2:number){
-  return Math.abs(Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)))
+  return Math.hypot(x2-x1, y2-y1)
+}
+
+function isOnScreen(x:number,y:number){
+  if (x > posX - canvas.width / 2 && x < posX + canvas.width / 2 && y > posY - canvas.height / 2 && y < posY + canvas.height / 2){
+    return true;
+  }
+
+  return false;
 }
