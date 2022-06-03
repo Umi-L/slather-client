@@ -50,6 +50,8 @@ let radius = 0;
 let body : SnakePoint[] = [];
 let heading = 0;
 
+let boosting = false;
+
 let foodOrbs:FoodOrb[] = [];
 
 let intervals:number[] = []
@@ -63,6 +65,14 @@ const resize = () => {
 
 resize();
 window.addEventListener('resize', resize);
+
+window.onmousedown = ()=>{
+  boosting = true;
+}
+
+window.onmouseup = () =>{
+  boosting = false;
+}
 
 
 
@@ -192,6 +202,8 @@ function drawSelf(){
 
 
   body.forEach((segment)=>{
+    if (!segment)
+      return
 
     //draw circle
     ctx.beginPath();
@@ -212,6 +224,9 @@ function nextFrame(){
 
   clearCanvas();
 
+
+  drawOrbs();
+  
   //updateSnakePos(dt);
 
   drawSelf();
@@ -220,13 +235,13 @@ function nextFrame(){
   
   checkFoodOrbs();
 
-  drawOrbs();
 
 }
 
 function updateServer(){
   let _data = {
-    heading: heading
+    heading: heading,
+    boosting: boosting
   }
 
   socket.send(JSON.stringify({method:"update", data: _data}))
