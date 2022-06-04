@@ -84,7 +84,7 @@ function joinGame(){
 
     socket = new WebSocket(ip);
 
-    socket.onopen = (e) => {
+    socket.onopen = () => {
 
       let data = { method:"connect", username: username }
 
@@ -118,12 +118,14 @@ function joinGame(){
           case "update":
             users = jsonData.data;
 
-            posX = users[id].body[0].x;
-            posY = users[id].body[0].y;
+            if (users[id]){
+              posX = users[id].body[0].x;
+              posY = users[id].body[0].y;
 
-            body = users[id].body;
+              body = users[id].body;
 
-            radius = users[id].radius;
+              radius = users[id].radius;
+            }
 
             foodOrbs = foodOrbs.concat(jsonData.orbs);
 
